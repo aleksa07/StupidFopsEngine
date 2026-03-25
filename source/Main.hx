@@ -93,6 +93,12 @@ class Main extends Sprite
 		FlxG.save.bind('funkin', CoolUtil.getSavePath());
 		Highscore.load();
 
+		#if windows
+		WindowColorMode.setDarkMode();
+		if (CoolUtil.hasVersion("Windows 10")) WindowColorMode.redrawWindowHeader();
+		#end
+
+
 		#if HSCRIPT_ALLOWED
 		Iris.warn = function(x, ?pos:haxe.PosInfos) {
 			Iris.logLevel(WARN, x, pos);

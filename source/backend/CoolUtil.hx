@@ -82,6 +82,13 @@ class CoolUtil
 		return Math.floor(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
 	}
 
+	/**
+	 * Can be used to check if your using a specific version of an OS (or if your using a certain OS).
+	 * Taken From JS-Engine
+	 */
+	public static function hasVersion(vers:String)
+		return lime.system.System.platformLabel.toLowerCase().indexOf(vers.toLowerCase()) != -1;
+
 	inline public static function dominantColor(sprite:flixel.FlxSprite):Int
 	{
 		var countByColor:Map<Int, Int> = [];

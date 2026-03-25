@@ -141,6 +141,10 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var infoBoxPosition:FlxPoint = FlxPoint.get(1000, 360);
 	var upperBox:PsychUIBox;
 	
+	var statsBox:PsychUIBox;
+	var statsBoxPosition:FlxPoint = FlxPoint.get(1000, 600); // adjust Y as needed
+	var statsText:FlxText;
+
 	var camUI:FlxCamera;
 
 	var prevGridBg:ChartingGridSprite;
@@ -382,6 +386,14 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		infoBox.getTab('Information').menu.add(infoText);
 		add(infoBox);
 
+		statsBox = new PsychUIBox(statsBoxPosition.x, statsBoxPosition.y, 260, 180, ['Note Stats']);
+		statsBox.scrollFactor.set();
+		statsBox.cameras = [camUI];
+		statsText = new FlxText(10, 10, 250, '', 11);
+		statsText.scrollFactor.set();
+		statsBox.getTab('Note Stats').menu.add(statsText);
+		add(statsBox);
+
 		mainBox = new PsychUIBox(mainBoxPosition.x, mainBoxPosition.y, 300, 280, ['Charting', 'Data', 'Events', 'Note', 'Section', 'Song']);
 		mainBox.selectedName = 'Song';
 		mainBox.scrollFactor.set();
@@ -401,6 +413,8 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			mainBox.setPosition(chartEditorSave.data.mainBoxPosition[0], chartEditorSave.data.mainBoxPosition[1]);
 		if(chartEditorSave.data.infoBoxPosition != null && chartEditorSave.data.infoBoxPosition.length > 1)
 			infoBox.setPosition(chartEditorSave.data.infoBoxPosition[0], chartEditorSave.data.infoBoxPosition[1]);
+		if(chartEditorSave.data.statsBoxPosition != null && chartEditorSave.data.statsBoxPosition.length > 1)
+			statsBox.setPosition(chartEditorSave.data.statsBoxPosition[0], chartEditorSave.data.statsBoxPosition[1]);
 
 		upperBox = new PsychUIBox(40, 40, 330, 300, ['File', 'Edit', 'View']);
 		upperBox.scrollFactor.set();
@@ -1350,6 +1364,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 							selectedNotes.remove(closest);
 							curRenderedNotes.remove(closest, true);
 							addUndoAction(DELETE_NOTE, !closest.isEvent ? {notes: [closest]} : {events: [closest]});
+							if(!isMovingNotes) updateStatsBox();
 						}
 						if(selectedNotes.length == 1) onSelectNote();
 						forceDataUpdate = true;
@@ -1385,6 +1400,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 							selectedNotes.push(noteAdded);
 							addUndoAction(ADD_NOTE, {notes: [noteAdded]});
+							if(!isMovingNotes) updateStatsBox();
 						}
 						else if(!lockedEvents)
 						{
@@ -1499,9 +1515,12 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			if(qPress) addSus *= -1;
 
 			if(qPress != ePress && selectedNotes.length != 1)
+			{
 				susLengthStepper.value += addSus;
+			}
 
 			var noteSec:Int = 0;
+			var sustainChanged:Bool = false;
 			for (note in selectedNotes)
 			{
 				if(note == null || !note.exists) continue;
@@ -1516,11 +1535,13 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 						note.setSustainLength(note.sustainLength + addSus, cachedSectionCrochets[noteSec] / 4, curZoom);
 						if(selectedNotes.length == 1)
 							susLengthStepper.value = note.sustainLength;
+						sustainChanged = true;
 					}
-					note.animation.update(elapsed); //let selected notes be animated for better visibility
+					note.animation.update(elapsed);
 				}
 				note.colorTransform.redMultiplier = note.colorTransform.greenMultiplier = note.colorTransform.blueMultiplier = sineValue;
 			}
+			if(sustainChanged && !isMovingNotes) updateStatsBox();
 		}
 		else noteSelectionSine = 0;
 
@@ -1638,6 +1659,112 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		}
 		selectionBox.scale.set(diffX, diffY);
 		selectionBox.updateHitbox();
+	}
+
+	function updateStatsBox():Void
+	{
+		if(statsText == null || notes == null) return;
+
+		// noteData 0-3 = player (BF), 4-7 = opponent (DAD)
+		// We track per-type counts separately.
+		// Map key: noteType string (empty string = normal note)
+
+		var leftCounts:Map<String, Int>  = new Map();
+		var rightCounts:Map<String, Int> = new Map();
+		var leftSustain:Map<String, Float>  = new Map();
+		var rightSustain:Map<String, Float> = new Map();
+		var leftLong:Map<String, Int>  = new Map();  // notes with sustain > 0
+		var rightLong:Map<String, Int> = new Map();
+
+		function getType(note:MetaNote):String
+		{
+			var t:String = note.noteType != null ? note.noteType.trim() : '';
+			return t;
+		}
+
+		for(note in notes)
+		{
+			if(note == null || note.isEvent || note.songData == null || note.songData.length < 2) continue;
+
+			var t:String = getType(note);
+			var isLeft:Bool = (note.songData[1] < GRID_COLUMNS_PER_PLAYER);
+
+			if(isLeft)
+			{
+				leftCounts.set(t, (leftCounts.exists(t) ? leftCounts.get(t) : 0) + 1);
+				if(note.sustainLength > 0)
+				{
+					leftLong.set(t,    (leftLong.exists(t)    ? leftLong.get(t)    : 0) + 1);
+					leftSustain.set(t, (leftSustain.exists(t) ? leftSustain.get(t) : 0.0) + note.sustainLength);
+				}
+			}
+			else
+			{
+				rightCounts.set(t, (rightCounts.exists(t) ? rightCounts.get(t) : 0) + 1);
+				if(note.sustainLength > 0)
+				{
+					rightLong.set(t,    (rightLong.exists(t)    ? rightLong.get(t)    : 0) + 1);
+					rightSustain.set(t, (rightSustain.exists(t) ? rightSustain.get(t) : 0.0) + note.sustainLength);
+				}
+			}
+		}
+
+		// Gather all unique types
+		var allTypes:Array<String> = [];
+		for(t in leftCounts.keys())  if(!allTypes.contains(t)) allTypes.push(t);
+		for(t in rightCounts.keys()) if(!allTypes.contains(t)) allTypes.push(t);
+		allTypes.sort((a, b) -> a == '' ? -1 : b == '' ? 1 : a < b ? -1 : 1); // normal notes first
+
+		var lines:Array<String> = [];
+
+		var totalLeft:Int  = 0;
+		var totalRight:Int = 0;
+		for(t in allTypes)
+		{
+			totalLeft  += leftCounts.exists(t)  ? leftCounts.get(t)  : 0;
+			totalRight += rightCounts.exists(t) ? rightCounts.get(t) : 0;
+		}
+		var totalNotes:Int = totalLeft + totalRight;
+
+		lines.push('Total: $totalNotes  (L: $totalLeft  R: $totalRight)');
+
+		var balanceStr:String = '';
+		if(totalNotes > 0)
+		{
+			var leftPct:Int  = Math.round(totalLeft  / totalNotes * 100);
+			var rightPct:Int = Math.round(totalRight / totalNotes * 100);
+			balanceStr = 'Balance: ${leftPct}% L / ${rightPct}% R';
+		}
+		else balanceStr = 'Balance: --';
+		lines.push(balanceStr);
+		lines.push('');
+
+		for(t in allTypes)
+		{
+			var label:String = (t == '') ? 'Normal' : t;
+			var lc:Int = leftCounts.exists(t)   ? leftCounts.get(t)   : 0;
+			var rc:Int = rightCounts.exists(t)  ? rightCounts.get(t)  : 0;
+			var ll:Int = leftLong.exists(t)     ? leftLong.get(t)     : 0;
+			var rl:Int = rightLong.exists(t)    ? rightLong.get(t)    : 0;
+			var ls:Float = leftSustain.exists(t)  ? leftSustain.get(t)  : 0.0;
+			var rs:Float = rightSustain.exists(t) ? rightSustain.get(t) : 0.0;
+
+			var totalType:Int = lc + rc;
+			lines.push('[$label] x$totalType  (L:$lc  R:$rc)');
+
+			if(ll + rl > 0)
+			{
+				var lsStr:String = ll > 0 ? '${ll} (${Math.round(ls)}ms)' : '0';
+				var rsStr:String = rl > 0 ? '${rl} (${Math.round(rs)}ms)' : '0';
+				lines.push('  holds  L:$lsStr  R:$rsStr');
+			}
+		}
+
+		statsText.text = lines.join('\n');
+		// Resize box height to fit text
+		var maxH:Float = FlxG.height - statsBox.y - 10;
+		var wantedH:Float = statsText.height + 40; // 40 for tab bar padding
+		statsBox.resize(280, Std.int(Math.min(wantedH, maxH)));
 	}
 
 	function showOutput(message:String, isError:Bool = false)
@@ -1963,7 +2090,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		var swagNote:MetaNote = new MetaNote(daStrumTime, daNoteData, note);
 		swagNote.mustPress = gottaHitNote;
 		swagNote.setSustainLength(note[2], cachedSectionCrochets[secNum] / 4, curZoom);
-		swagNote.gfNote = (section.gfSection && gottaHitNote == section.mustHitSection);
+		// swagNote.gfNote = (section.gfSection && gottaHitNote == section.mustHitSection); Causes Crashes for some reason
 		swagNote.noteType = note[3];
 		swagNote.scrollFactor.x = 0;
 		var txt:FlxText = swagNote.findNoteTypeText(swagNote.noteType != null ? noteTypes.indexOf(swagNote.noteType) : 0);
@@ -2246,6 +2373,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 				}
 			}
 		}
+		if(!isMovingNotes) updateStatsBox();
 	}
 
 	function getMinNoteTime(sec:Int)
@@ -4884,6 +5012,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			case PsychUIBox.DROP_EVENT:
 				chartEditorSave.data.mainBoxPosition = [mainBox.x, mainBox.y];
 				chartEditorSave.data.infoBoxPosition = [infoBox.x, infoBox.y];
+				chartEditorSave.data.statsBoxPosition = [statsBox.x, statsBox.y];
 		}
 	}
 
@@ -4911,6 +5040,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		openSubState(new EditorPlayState(cast notes, [vocals, opponentVocals]));
 		upperBox.isMinimized = true;
 		upperBox.visible = mainBox.visible = infoBox.visible = false;
+		upperBox.visible = mainBox.visible = infoBox.visible = statsBox.visible = false;
 	}
 
 	function goToPlayState()
@@ -4939,6 +5069,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		upperBox.isMinimized = true;
 		upperBox.visible = mainBox.visible = infoBox.visible = true;
 		upperBox.bg.visible = false;
+		statsBox.visible = true;
 		updateAudioVolume();
 	}
 
