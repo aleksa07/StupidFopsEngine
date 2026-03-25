@@ -16,7 +16,7 @@ import openfl.display.Sprite;
 import openfl.events.Event;
 import openfl.display.StageScaleMode;
 import lime.app.Application;
-import states.TitleState;
+import states.StartupState;
 
 #if HSCRIPT_ALLOWED
 import crowplexus.iris.Iris;
@@ -40,6 +40,19 @@ import haxe.io.Path;
 
 import backend.Highscore;
 
+#if windows
+@:buildXml('
+<target id="haxe">
+	<lib name="wininet.lib" if="windows" />
+	<lib name="dwmapi.lib" if="windows" />
+</target>
+')
+@:cppFileCode('
+#include <windows.h>
+#include <winuser.h>
+')
+#end
+
 // NATIVE API STUFF, YOU CAN IGNORE THIS AND SCROLL //
 #if (linux && !debug)
 @:cppInclude('./external/gamemode_client.h')
@@ -52,7 +65,7 @@ class Main extends Sprite
 	public static final game = {
 		width: 1280, // WINDOW width
 		height: 720, // WINDOW height
-		initialState: TitleState, // initial game state
+		initialState: StartupState, // initial game state
 		framerate: 60, // default framerate
 		skipSplash: true, // if the default flixel splash screen should be skipped
 		startFullscreen: false // if the game should start at fullscreen mode
@@ -92,6 +105,14 @@ class Main extends Sprite
 
 		FlxG.save.bind('funkin', CoolUtil.getSavePath());
 		Highscore.load();
+
+		#if (cpp && windows)
+		untyped __cpp__("
+			SetProcessDPIAware(); // allows for more crisp visuals
+			SetConsoleOutputCP(CP_UTF8);
+			DisableProcessWindowsGhosting(); // lets you move the window and such if it's not responding
+		");
+		#end
 
 		#if windows
 		WindowColorMode.setDarkMode();

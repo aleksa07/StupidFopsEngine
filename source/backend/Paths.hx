@@ -205,8 +205,20 @@ class Paths
 		return 'assets/videos/$key.$VIDEO_EXT';
 	}
 
+	static public function legacyvideo(key:String, library:String)
+	{
+		#if MODS_ALLOWED
+		var file:String = modsVideo(key);
+		if(FileSystem.exists(file)) return file;
+		#end
+		return 'assets/$library/videos/$key.$VIDEO_EXT';
+	}
+
 	inline static public function sound(key:String, ?modsAllowed:Bool = true):Sound
 		return returnSound('sounds/$key', modsAllowed);
+
+	inline static public function legacysound(key:String, ?library:String = null, ?modsAllowed:Bool = true):Sound
+    	return returnSound('/sounds/$key', '$library', modsAllowed);
 
 	inline static public function music(key:String, ?modsAllowed:Bool = true):Sound
 		return returnSound('music/$key', modsAllowed);
