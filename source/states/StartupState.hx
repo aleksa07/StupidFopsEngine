@@ -7,7 +7,7 @@ class StartupState extends MusicBeatState
 	var logo:FlxSprite;
 	var skipTxt:FlxText;
 
-	var maxIntros:Int = 9;
+	var maxIntros:Int = 12;
 
 	var canChristmas = false;
 	var canAutism = false;
@@ -188,7 +188,18 @@ class StartupState extends MusicBeatState
 					{
 						startVideo('oops', "splash");
 					}
-
+				case 10:
+					{
+						startVideo('meow', "splash");
+					}
+				case 11:
+					{
+						startVideo('19combo', "splash");
+					}				
+				case 12:
+					{
+						startVideo('19combo', "splash");
+					}	
 					
 			}
 		}
