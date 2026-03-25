@@ -198,7 +198,7 @@ class StartupState extends MusicBeatState
 					}				
 				case 12:
 					{
-						startVideo('19combo', "splash");
+						startVideo('womp', "splash");
 					}	
 					
 			}
