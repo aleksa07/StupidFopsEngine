@@ -7,12 +7,14 @@ class StartupState extends MusicBeatState
 	var logo:FlxSprite;
 	var skipTxt:FlxText;
 
-	var maxIntros:Int = 12;
-
 	var canChristmas = false;
 	var canAutism = false;
 
+	// All video names found in the splash video folder
+	var splashVideos:Array<String> = [];
+
 	private var vidSprite:VideoSprite = null;
+
 	private function startVideo(name:String, ?library:String = null, ?callback:Void->Void = null, canSkip:Bool = true, loop:Bool = false, playOnLoad:Bool = true)
 	{
 		#if VIDEOS_ALLOWED
@@ -29,8 +31,8 @@ class StartupState extends MusicBeatState
 		if (foundFile)
 		{
 			vidSprite = new VideoSprite(fileName, false, canSkip, loop);
+			vidSprite.scrollFactor.set();
 
-			// Finish callback
 			function onVideoEnd()
 			{
 				FlxG.switchState(TitleState.new);
@@ -43,36 +45,68 @@ class StartupState extends MusicBeatState
 				vidSprite.videoSprite.play();
 			return vidSprite;
 		}
-		else {
+		else
+		{
 			FlxG.log.error("Video not found: " + fileName);
 			new FlxTimer().start(0.1, function(tmr:FlxTimer) {
-				doIntro();
+				FlxG.switchState(TitleState.new);
 			});
 		}
 		#else
 		FlxG.log.warn('Platform not supported!');
 		new FlxTimer().start(0.1, function(tmr:FlxTimer) {
-			doIntro();
+			FlxG.switchState(TitleState.new);
 		});
 		#end
 		return null;
 	}
 
+	// Scans the splash video folder and collects ALL video file names (without extension)
+	function scanSplashVideos():Void
+	{
+		splashVideos = [];
+
+		#if sys
+		// Use a dummy name to resolve what folder Paths points to for 'splash' videos
+		var samplePath:String = Paths.legacyvideo('_dummy_', 'splash');
+		var folderPath:String = haxe.io.Path.directory(samplePath);
+
+		FlxG.log.notice('Scanning video folder: ' + folderPath);
+
+		if (FileSystem.exists(folderPath) && FileSystem.isDirectory(folderPath))
+		{
+			for (file in FileSystem.readDirectory(folderPath))
+			{
+				var ext:String = haxe.io.Path.extension(file).toLowerCase();
+				if (ext == 'mp4' || ext == 'webm' || ext == 'ogv' || ext == 'avi' || ext == 'mov')
+				{
+					var baseName:String = haxe.io.Path.withoutExtension(file);
+					splashVideos.push(baseName);
+				}
+			}
+		}
+		else
+		{
+			FlxG.log.error('Splash video folder not found: ' + folderPath);
+		}
+		#end
+
+		FlxG.log.notice('Found ${splashVideos.length} splash video(s): ' + splashVideos.join(', '));
+	}
+
 	override public function create():Void
 	{
-		if (DateUtils.isChristmas()) //Only triggers if the date is between 12/16 and 12/31
-		{
+		if (DateUtils.isChristmas())
 			canChristmas = true;
-			maxIntros += 1; //JOLLY SANTA!!!
-		}
-		else if (DateUtils.isAprilFools()) // funny
-		{
+		else if (DateUtils.isAprilFools())
 			canAutism = true;
-			maxIntros += 1; //autism!!!!!!!!!!!!!!!!!!!!!!oubgrebiugerbiuegrs
-			// burger
-		}
+
+		// Scan folder first so splashVideos is populated before doIntro runs
+		scanSplashVideos();
+
 		FlxTransitionableState.skipNextTransIn = true;
 		FlxTransitionableState.skipNextTransOut = true;
+
 		logo = new FlxSprite().loadGraphic(Paths.image('sillyLogo', 'splash'));
 		logo.scrollFactor.set();
 		logo.screenCenter();
@@ -101,108 +135,26 @@ class StartupState extends MusicBeatState
 		super.create();
 	}
 
-	function onIntroDone(?fadeDelay:Float = 0) {
-		FlxTween.tween(logo, {alpha: 0}, 1, {
-			startDelay: fadeDelay,
-			ease: FlxEase.linear,
-			onComplete: function(_) {
-				FlxG.switchState(TitleState.new);
-			}
-		});
-	}
-
-	function doIntro() {
-		#if debug // for testing purposes
-			startVideo('broCopiedDenpa', 'splash');
-		#else
-		final debugShit = false;
-		final theIntro:Int = FlxG.random.int(0, maxIntros);
-		if (debugShit)
-			startVideo('bambiStartup', 'splash'); // shit was crashing & I don't feel like making debug builds :P
+	function doIntro()
+	{
+		#if debug
+		// In debug: always play the first video found
+		if (splashVideos.length > 0)
+			startVideo(splashVideos[0], 'splash');
 		else
+			FlxG.switchState(TitleState.new);
+		#else
+		if (splashVideos.length == 0)
 		{
-			switch (theIntro) {
-				case 0:
-					FlxG.sound.play(Paths.legacysound('startup', 'splash'));
-					logo.scale.set(0.1,0.1);
-					logo.updateHitbox();
-					logo.screenCenter();
-					FlxTween.tween(logo, {alpha: 1, "scale.x": 1, "scale.y": 1}, 0.95, {ease: FlxEase.expoOut, onComplete: _ -> onIntroDone()});
-				case 1:
-					FlxG.sound.play(Paths.legacysound('startup', 'splash'));
-					FlxG.sound.play(Paths.legacysound('FIREINTHEHOLE', 'splash'));
-					logo.loadGraphic(Paths.image('lobotomy', 'splash',));
-					logo.scale.set(0.1,0.1);
-					logo.updateHitbox();
-					logo.screenCenter();
-					FlxTween.tween(logo, {alpha: 1, "scale.x": 1, "scale.y": 1}, 1.35, {ease: FlxEase.expoOut, onComplete: _ -> onIntroDone()});
-				case 2:
-					FlxG.sound.play(Paths.legacysound('screwedEngine', 'splash'));
-					logo.loadGraphic(Paths.image('ScrewedLogo', 'splash', ));
-					logo.scale.set(0.1,0.1);
-					logo.updateHitbox();
-					logo.screenCenter();
-					FlxTween.tween(logo, {alpha: 1, "scale.x": 1, "scale.y": 1}, 1.35, {ease: FlxEase.expoOut, onComplete: _ -> onIntroDone(0.6)});
-				case 3:
-					// secret muaahahhahhahaahha
-					FlxG.sound.play(Paths.legacysound('tada' ,'splash'));
-					logo.loadGraphic(Paths.image('JavaScriptLogo', 'splash', ));
-					logo.scale.set(0.1,0.1);
-					logo.updateHitbox();
-					logo.screenCenter();
-					FlxTween.tween(logo, {alpha: 1, "scale.x": 1, "scale.y": 1}, 1.35, {ease: FlxEase.expoOut, onComplete: _ -> onIntroDone(0.6)});
-				case 4:
-					startVideo('bambiStartup', 'splash');
-				case 5:
-					startVideo('broCopiedDenpa', 'splash');
-				case 6:
-					if (canChristmas)
-					{
-						FlxG.sound.play(Paths.legacysound('JollySanta', 'splash'));
-						logo.loadGraphic(Paths.image('JollySantaLogo', 'splash', ));
-						logo.scale.set(0.1,0.1);
-						logo.updateHitbox();
-						logo.screenCenter();
-						FlxTween.tween(logo, {alpha: 1, "scale.x": 1, "scale.y": 1}, 2, {ease: FlxEase.expoOut, onComplete: _ -> onIntroDone(1.5)});
-					}
-					else
-						doIntro();
-
-				case 7:
-					if (canAutism)
-					{
-						FlxG.sound.play(Paths.legacysound('aprilFools', 'splash'));
-						logo.loadGraphic(Paths.image('autism', 'splash',));
-						logo.scale.set(0.1,0.1);
-						logo.updateHitbox();
-						logo.screenCenter();
-						FlxTween.tween(logo, {alpha: 1, "scale.x": 1, "scale.y": 1}, 0.95, {ease: FlxEase.linear, onComplete: _ -> onIntroDone()});
-					}
-					else
-						doIntro();
-				case 8:
-					{
-						startVideo('haxe', "splash");
-					}
-				case 9:
-					{
-						startVideo('oops', "splash");
-					}
-				case 10:
-					{
-						startVideo('meow', "splash");
-					}
-				case 11:
-					{
-						startVideo('19combo', "splash");
-					}				
-				case 12:
-					{
-						startVideo('womp', "splash");
-					}	
-					
-			}
+			FlxG.log.warn('No splash videos found, skipping to title.');
+			FlxG.switchState(TitleState.new);
+			return;
 		}
+
+		// Pick a random video from everything in the folder
+		var picked:String = splashVideos[FlxG.random.int(0, splashVideos.length - 1)];
+		FlxG.log.notice('Playing splash video: ' + picked);
+		startVideo(picked, 'splash');
 		#end
 	}
 

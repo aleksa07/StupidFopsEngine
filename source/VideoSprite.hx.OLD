@@ -23,10 +23,6 @@ class VideoSprite extends FlxSpriteGroup
 
   public var waiting:Bool = false;
 
-  // Target resolution — change these if the game ever switches res
-  static inline final TARGET_WIDTH:Int  = 1280;
-  static inline final TARGET_HEIGHT:Int = 720;
-
   public function new(videoName:String, isWaiting:Bool, canSkip:Bool = false, shouldLoop:Dynamic = false, autoPause:Bool = true)
   {
     super();
@@ -45,23 +41,30 @@ class VideoSprite extends FlxSpriteGroup
       add(cover);
     }
 
-    // initialize sprites
-    videoSprite = new FlxVideoSprite();
-    videoSprite.antialiasing = ClientPrefs.data.antialiasing;
-    add(videoSprite);
-    if (canSkip) this.canSkip = true;
+		// initialize sprites
+		videoSprite = new FlxVideoSprite();
+		videoSprite.antialiasing = ClientPrefs.data.antialiasing;
+		add(videoSprite);
+		if(canSkip) this.canSkip = true;
 
     // callbacks
     if (!shouldLoop) videoSprite.bitmap.onEndReached.add(destroy);
 
     videoSprite.bitmap.onFormatSetup.add(function() {
-      // Force the video to exactly 1280x720 regardless of source resolution
-      videoSprite.setGraphicSize(TARGET_WIDTH, TARGET_HEIGHT);
+      /*
+        #if hxvlc
+        var wd:Int = videoSprite.bitmap.formatWidth;
+        var hg:Int = videoSprite.bitmap.formatHeight;
+        trace('Video Resolution: ${wd}x${hg}');
+        videoSprite.scale.set(FlxG.width / wd, FlxG.height / hg);
+        #end
+       */
+      videoSprite.setGraphicSize(FlxG.width);
       videoSprite.updateHitbox();
       videoSprite.screenCenter();
     });
 
-    // start video
+    // start video and adjust resolution to screen size
     videoSprite.load(videoName, shouldLoop ? ['input-repeat=65545'] : null);
   }
 
@@ -95,7 +98,7 @@ class VideoSprite extends FlxSpriteGroup
   {
     if (canSkip)
     {
-      if (Controls.instance.pressed('accept'))
+      if (Controls.instance.pressed('accept')) // && Controls.instance.ACCEPT_P
       {
         holdingTime = Math.max(0, Math.min(_timeToSkip, holdingTime + elapsed));
       }
