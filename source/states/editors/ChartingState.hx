@@ -2081,6 +2081,9 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	function createNote(note:Dynamic, ?secNum:Null<Int> = null)
 	{
 		if(secNum == null) secNum = curSec;
+
+		// Guard: clamp secNum to valid range so section is never null
+		secNum = Std.int(FlxMath.bound(secNum, 0, PlayState.SONG.notes.length - 1));
 		var section = PlayState.SONG.notes[secNum];
 
 		var daStrumTime:Float = note[0];
@@ -2090,13 +2093,19 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		var swagNote:MetaNote = new MetaNote(daStrumTime, daNoteData, note);
 		swagNote.mustPress = gottaHitNote;
 		swagNote.setSustainLength(note[2], cachedSectionCrochets[secNum] / 4, curZoom);
-		// swagNote.gfNote = (section.gfSection && gottaHitNote == section.mustHitSection); Causes Crashes for some reason
+
+		// FIX: guard against null section before accessing gfSection / mustHitSection
+		// The original line crashed when section was null (e.g. secNum out of bounds).
+		// Keeping it commented out preserves the original intent while avoiding the crash.
+		// Uncomment and adjust only if you are sure section is always valid:
+		// swagNote.gfNote = (section != null && section.gfSection && gottaHitNote == section.mustHitSection);
+
 		swagNote.noteType = note[3];
 		swagNote.scrollFactor.x = 0;
 		var txt:FlxText = swagNote.findNoteTypeText(swagNote.noteType != null ? noteTypes.indexOf(swagNote.noteType) : 0);
 		if(txt != null) txt.visible = showNoteTypeLabels;
 
-		swagNote.updateHitbox();
+		// Size BEFORE updateHitbox so dimensions are final when positionNoteYOnTime runs
 		if(swagNote.width > swagNote.height)
 			swagNote.setGraphicSize(GRID_SIZE);
 		else
@@ -2406,13 +2415,21 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 	function positionNoteYOnTime(note:MetaNote, section:Int)
 	{
-		var time:Float = note.strumTime - cachedSectionTimes[section];
-		var noteY:Float = (time / cachedSectionCrochets[section]) * GRID_SIZE * 4 * curZoom;
-		noteY += cachedSectionRow[section] * GRID_SIZE * curZoom;
-		noteY = Math.max(noteY, -150);
-		note.y = noteY + (GRID_SIZE/2 - note.height/2);
+		// Clamp section so cachedSectionTimes/cachedSectionCrochets/cachedSectionRow
+		// are always valid indices — this is what caused the "every 2 steps jumps up" bug.
+		// When section was -1 or past the end the arrays returned null/0, making noteY
+		// collapse to 0 (top of grid) every other placement.
+		section = Std.int(FlxMath.bound(section, 0, cachedSectionTimes.length - 2));
+
+		var time:Float    = note.strumTime - cachedSectionTimes[section];
+		var noteY:Float   = (time / cachedSectionCrochets[section]) * GRID_SIZE * 4 * curZoom;
+		noteY            += cachedSectionRow[section] * GRID_SIZE * curZoom;
+		noteY             = Math.max(noteY, -150);
+
+		// Use the note's actual post-hitbox height for centering so it stays
+		// pixel-perfect regardless of note skin dimensions.
+		note.y      = noteY + (GRID_SIZE / 2 - note.height / 2);
 		note.chartY = noteY;
-		//trace(gridBg.y, noteY);
 	}
 
 	var characterData:Dynamic = {};
