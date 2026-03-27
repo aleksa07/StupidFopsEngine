@@ -220,6 +220,9 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var waveformEnabled:Bool = false;
 	var waveformTarget:WaveformTarget = INST;
 
+	var lilBf:FlxSprite;
+    var lilOpp:FlxSprite;
+
 	override function create()
 	{
 		if(Difficulty.list.length < 1) Difficulty.resetList();
@@ -286,6 +289,53 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		add(behindRenderedNotes);
 		add(curRenderedNotes);
 		add(movingNotes);
+		
+		//LilStage
+        var lilStage:FlxSprite = new FlxSprite(0).loadGraphic(Paths.image('ChartEditor/lilStage'));
+        lilStage.antialiasing = false;
+        lilStage.scrollFactor.set(0, 0);
+        lilStage.x = 10;
+        lilStage.y = FlxG.height - 266;
+        lilStage.setGraphicSize(Std.int(lilStage.width));
+        lilStage.updateHitbox();
+        add(lilStage);
+
+		//Lilbf
+        lilBf = new FlxSprite(0, 0);
+        lilBf.antialiasing = false;
+        lilBf.frames = Paths.getSparrowAtlas('ChartEditor/lilBf');
+        lilBf.animation.addByPrefix('idle', 'lilbf idle', 12);
+        lilBf.animation.play('idle');
+        
+        lilBf.animation.addByPrefix('0', 'lilbf left', 12);
+        lilBf.animation.addByPrefix('1', 'lilbf down', 12);
+        lilBf.animation.addByPrefix('2', 'lilbf up', 12);
+        lilBf.animation.addByPrefix('3', 'lilbf right', 12);
+        lilBf.scrollFactor.set(0, 0);
+        lilBf.setGraphicSize(Std.int(lilBf.width));
+        lilBf.x = 0;
+        lilBf.y = FlxG.height - 266;
+        lilBf.updateHitbox();
+        add(lilBf);
+
+		//LilOponent
+        lilOpp = new FlxSprite(0, 0);
+        lilOpp.antialiasing = false;
+        lilOpp.frames = Paths.getSparrowAtlas('ChartEditor/lilOpp');
+        
+        lilOpp.animation.addByPrefix('idle', 'lilOpp idle', 12);
+        lilOpp.animation.play('idle');
+        
+        lilOpp.animation.addByPrefix('0', 'lilOpp left', 12);
+        lilOpp.animation.addByPrefix('1', 'lilOpp down', 12);
+        lilOpp.animation.addByPrefix('2', 'lilOpp up', 12);
+        lilOpp.animation.addByPrefix('3', 'lilOpp right', 12);
+        lilOpp.scrollFactor.set(0, 0);
+        lilOpp.setGraphicSize(Std.int(lilOpp.width));
+        lilOpp.x = 15;
+        lilOpp.y = FlxG.height - 266;
+        lilOpp.updateHitbox();
+        add(lilOpp);
 
 		eventLockOverlay = new FlxSprite(gridBg.x, 0).makeGraphic(1, 1, FlxColor.BLACK);
 		eventLockOverlay.alpha = 0.6;
@@ -683,6 +733,9 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 	var autoSaveCap:Int = 2; //in minutes
 	var backupLimit:Int = 10;
 
+	var lilBfResetAnim:Float = 0;
+    var lilOppResetAnim:Float = 0;
+
 	var lastBeatHit:Int = 0;
 	override function update(elapsed:Float)
 	{
@@ -939,6 +992,8 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 				}
 				else if(FlxG.keys.pressed.W != FlxG.keys.pressed.S || FlxG.mouse.wheel != 0)
 				{
+					var lilBfResetAnim:Float = 0;
+    				var lilOppResetAnim:Float = 0;
 					if(FlxG.sound.music.playing)
 						setSongPlaying(false);
 
@@ -964,6 +1019,8 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 				}
 				else if(FlxG.keys.justPressed.SPACE)
 				{
+					var lilBfResetAnim:Float = 0;
+    				var lilOppResetAnim:Float = 0;
 					setSongPlaying(!FlxG.sound.music.playing);
 				}
 			}
@@ -971,6 +1028,22 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			if(!songFinished) Conductor.songPosition = FlxMath.bound(FlxG.sound.music.time + Conductor.offset, 0, FlxG.sound.music.length - 1);
 			updateScrollY();
 		}
+
+		if(lilOppResetAnim > 0) {
+            lilOppResetAnim -= elapsed;
+            if(lilOppResetAnim <= 0) {
+                lilOpp.animation.play('idle');
+                lilOppResetAnim = 0;
+            }
+        }
+        
+        if(lilBfResetAnim > 0) {
+            lilBfResetAnim -= elapsed;
+            if(lilBfResetAnim <= 0) {
+                lilBf.animation.play('idle');
+                lilBfResetAnim = 0;
+            }
+        }
 
 		super.update(elapsed);
 		
@@ -1485,6 +1558,18 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 
 					if(vortexPlaying)
 					{
+						if (!note.noAnimation) {
+							if (note.mustPress)
+							{
+								lilBf.animation.play("" + (note.noteData % 4), true);
+								lilBfResetAnim = ((Conductor.stepCrochet * 3) + note.sustainLength) / 1000 / playbackRate;
+							}
+							else
+							{
+								lilOpp.animation.play("" + (note.noteData % 4), true);
+								lilOppResetAnim = ((Conductor.stepCrochet * 3) + note.sustainLength) / 1000 / playbackRate;
+							}
+						}
 						var strumNote:StrumNote = strumLineNotes.members[note.songData[1]];
 						if(strumNote != null)
 						{
@@ -1727,16 +1812,6 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 		var totalNotes:Int = totalLeft + totalRight;
 
 		lines.push('Total: $totalNotes  (L: $totalLeft  R: $totalRight)');
-
-		var balanceStr:String = '';
-		if(totalNotes > 0)
-		{
-			var leftPct:Int  = Math.round(totalLeft  / totalNotes * 100);
-			var rightPct:Int = Math.round(totalRight / totalNotes * 100);
-			balanceStr = 'Balance: ${leftPct}% L / ${rightPct}% R';
-		}
-		else balanceStr = 'Balance: --';
-		lines.push(balanceStr);
 		lines.push('');
 
 		for(t in allTypes)
