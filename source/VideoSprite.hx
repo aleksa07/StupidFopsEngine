@@ -55,8 +55,18 @@ class VideoSprite extends FlxSpriteGroup
     if (!shouldLoop) videoSprite.bitmap.onEndReached.add(destroy);
 
     videoSprite.bitmap.onFormatSetup.add(function() {
-      // Force the video to exactly 1280x720 regardless of source resolution
-      videoSprite.setGraphicSize(TARGET_WIDTH, TARGET_HEIGHT);
+      // Scale to fit within target while preserving aspect ratio (letterbox)
+      var vidW = videoSprite.bitmap.width;
+      var vidH = videoSprite.bitmap.height;
+
+      if (vidW > 0 && vidH > 0) {
+        var scaleX:Float = TARGET_WIDTH / vidW;
+        var scaleY:Float = TARGET_HEIGHT / vidH;
+        var s:Float = Math.min(scaleX, scaleY);
+        videoSprite.setGraphicSize(Std.int(vidW * s), Std.int(vidH * s));
+      } else {
+        videoSprite.setGraphicSize(TARGET_WIDTH, TARGET_HEIGHT);
+      }
       videoSprite.updateHitbox();
       videoSprite.screenCenter();
     });
